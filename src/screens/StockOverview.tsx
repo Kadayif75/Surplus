@@ -1,0 +1,20 @@
+import { useState } from 'react';
+import type { InventorySnapshot } from '../domain/types';
+interface Props { data: InventorySnapshot; room: string; setRoom: (id: string) => void; book: (id: string, type: 'IN' | 'OUT') => void; scan: () => void }
+export function StockOverview({ data, room, setRoom, book, scan }: Props) {
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState('tena-760364');
+  const products = data.products.filter(p => `${p.name} ${p.variant} ${p.tenaArticleNumber} ${data.mappings.filter(m => m.productId === p.id).map(m => m.rawValue).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
+  const product = data.products.find(p => p.id === selected)!;
+  const quantity = (id: string, location?: string) => data.stocks.filter(s => s.productId === id && (!location || s.locationId === location)).reduce((sum, s) => sum + s.quantityPacks, 0);
+  const total = data.stocks.filter(s => room === 'all' || s.locationId === room).reduce((sum, s) => sum + s.quantityPacks, 0);
+  return <>
+    <div className="page-heading"><div><p className="eyebrow">Ganshoek / voorraadbeheer</p><h1>Voorraad</h1><p>Bekijk de verpakkingen per voorraadruimte.</p></div><button className="primary" onClick={scan}>Barcode scannen</button></div>
+    <section className="toolbar" aria-label="Voorraadfilters"><label>Voorraadruimte<select value={room} onChange={e => setRoom(e.target.value)}><option value="all">Alle ruimtes · alleen bekijken</option>{data.locations.map(l => <option key={l.id} value={l.id}>{l.id} · {l.name}</option>)}</select></label><label className="search-label">Product zoeken<input type="search" placeholder="Naam, artikelnummer of barcode" value={search} onChange={e => setSearch(e.target.value)} /></label></section>
+    <div className="stock-summary"><span><strong>{total}</strong> verpakkingen {room === 'all' ? 'in alle ruimtes' : `in ${room}`}</span><span>8 producten · 3 voorraadruimtes</span></div>
+    <div className="stock-layout"><section className="card product-list" aria-label="Producten"><div className="list-head"><span>Product <small>({products.length})</small></span><span>{room === 'all' ? 'Totaal' : room}</span></div>
+      {products.length === 0 && <p className="empty">Geen producten gevonden. Probeer een andere zoekterm.</p>}
+      {products.map(p => <button className={`product-row ${selected === p.id ? 'selected' : ''}`} key={p.id} aria-pressed={selected === p.id} onClick={() => setSelected(p.id)}><span><strong>{p.name}</strong><small>{p.variant} · Artikel {p.tenaArticleNumber}</small><small>Totaal: {quantity(p.id)} verpakkingen</small></span><span className="quantity">{quantity(p.id, room === 'all' ? undefined : room)}<small>{quantity(p.id, room === 'all' ? undefined : room) === 0 ? 'Geen voorraad' : 'verpakkingen'}</small></span></button>)}
+    </section><aside className="card product-detail" aria-label="Productdetails"><p className="eyebrow">Productdetails</p><h2>{product.name}</h2><p>{product.variant} · Artikel {product.tenaArticleNumber}</p><div className="total-block"><strong>{quantity(product.id)}</strong><span>verpakkingen in totaal</span></div><div className="room-stocks">{data.locations.map(l => <div key={l.id} className={room === l.id ? 'active-room' : ''}><span><b>{l.id}</b> {l.name}</span><strong>{quantity(product.id, l.id)}</strong></div>)}</div><p className="metadata">{product.piecesPerPack} stuks per verpakking · {product.packsPerBox} verpakkingen per doos</p><div className="stack"><button className="primary" disabled={room === 'all'} onClick={() => book(product.id, 'IN')}>Voorraad toevoegen</button><button className="secondary" disabled={room === 'all'} onClick={() => book(product.id, 'OUT')}>Voorraad afboeken</button></div>{room === 'all' && <p className="notice">Kies één voorraadruimte om toe te voegen of af te boeken.</p>}<p className="small">Je boekt alleen ongeopende verpakkingen. Artikelen en eenheden moeten vóór een praktijkpilot worden gecontroleerd.</p></aside></div>
+  </>;
+}
